@@ -1,40 +1,46 @@
 #include "osd.h"
 
+bool osd_t::try_receive(osd_client_t & cl)
+{
+    int peer_fd = cl.peer_fd;
+    io_uring_sqe* sqe = ringloop->get_sqe();
+    if (!sqe)
+    {
+        return false;
+    }
+    ring_data_t* data = ((ring_data_t*)sqe->user_data);
+    if (!cl.read_buf)
+    {
+        // no reads in progress
+        // so this is either a new command or a reply to a previously sent command
+        if (!cl.read_op)
+        {
+            cl.read_op = new osd_op_t;
+            cl.read_op->peer_fd = peer_fd;
+        }
+        cl.read_op->op_type = OSD_OP_IN;
+        cl.read_buf = &cl.read_op->req.buf;
+        cl.read_remaining = OSD_PACKET_SIZE;
+        cl.read_state = CL_READ_OP;
+    }
+    cl.read_iov.iov_base = cl.read_buf;
+    cl.read_iov.iov_len = cl.read_remaining;
+    cl.read_msg.msg_iov = &cl.read_iov;
+    cl.read_msg.msg_iovlen = 1;
+    data->callback = [this, peer_fd](ring_data_t *data) { handle_read(data, peer_fd); };
+    my_uring_prep_recvmsg(sqe, peer_fd, &cl.read_msg, 0);
+    return true;
+}
+
 void osd_t::read_requests()
 {
-    for (int i = 0; i < read_ready_clients.size(); i++)
+    for (auto & p: clients)
     {
-        int peer_fd = read_ready_clients[i];
-        auto & cl = clients[peer_fd];
-        io_uring_sqe* sqe = ringloop->get_sqe();
-        if (!sqe)
+        if (p.second.peer_state == PEER_CONNECTED && p.second.read_iov.iov_len == 0)
         {
-            read_ready_clients.erase(read_ready_clients.begin(), read_ready_clients.begin() + i);
-            return;
+            try_receive(p.second);
         }
-        ring_data_t* data = ((ring_data_t*)sqe->user_data);
-        if (!cl.read_buf)
-        {
-            // no reads in progress
-            // so this is either a new command or a reply to a previously sent command
-            if (!cl.read_op)
-            {
-                cl.read_op = new osd_op_t;
-                cl.read_op->peer_fd = peer_fd;
-            }
-            cl.read_op->op_type = OSD_OP_IN;
-            cl.read_buf = &cl.read_op->req.buf;
-            cl.read_remaining = OSD_PACKET_SIZE;
-            cl.read_state = CL_READ_OP;
-        }
-        cl.read_iov.iov_base = cl.read_buf;
-        cl.read_iov.iov_len = cl.read_remaining;
-        cl.read_msg.msg_iov = &cl.read_iov;
-        cl.read_msg.msg_iovlen = 1;
-        data->callback = [this, peer_fd](ring_data_t *data) { handle_read(data, peer_fd); };
-        my_uring_prep_recvmsg(sqe, peer_fd, &cl.read_msg, 0);
     }
-    read_ready_clients.clear();
 }
 
 void osd_t::handle_read(ring_data_t *data, int peer_fd)
@@ -43,11 +49,9 @@ void osd_t::handle_read(ring_data_t *data, int peer_fd)
     if (cl_it != clients.end())
     {
         auto & cl = cl_it->second;
+        cl.read_iov.iov_len = 0;
         if (data->res == -EAGAIN)
         {
-            cl.read_ready--;
-            if (cl.read_ready > 0)
-                read_ready_clients.push_back(peer_fd);
             return;
         }
         else if (data->res < 0)
@@ -57,7 +61,6 @@ void osd_t::handle_read(ring_data_t *data, int peer_fd)
             stop_client(peer_fd);
             return;
         }
-        read_ready_clients.push_back(peer_fd);
         if (data->res > 0)
         {
             cl.read_remaining -= data->res;

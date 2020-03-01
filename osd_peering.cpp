@@ -89,7 +89,7 @@ void osd_t::connect_peer(osd_num_t osd_num, const char *peer_host, int peer_port
     // Add FD to epoll (EPOLLOUT for tracking connect() result)
     epoll_event ev;
     ev.data.fd = peer_fd;
-    ev.events = EPOLLOUT | EPOLLIN | EPOLLRDHUP | EPOLLET;
+    ev.events = EPOLLOUT | EPOLLRDHUP | EPOLLET;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, peer_fd, &ev) < 0)
     {
         throw std::runtime_error(std::string("epoll_ctl: ") + strerror(errno));
@@ -115,12 +115,13 @@ void osd_t::handle_connect_result(int peer_fd)
     }
     int one = 1;
     setsockopt(peer_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
+    fcntl(peer_fd, F_SETFL, fcntl(peer_fd, F_GETFL, 0) & ~O_NONBLOCK);
     // Disable EPOLLOUT on this fd
     cl.connect_callback = NULL;
     cl.peer_state = PEER_CONNECTED;
     epoll_event ev;
     ev.data.fd = peer_fd;
-    ev.events = EPOLLIN | EPOLLRDHUP | EPOLLET;
+    ev.events = EPOLLRDHUP | EPOLLET;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_MOD, peer_fd, &ev) < 0)
     {
         throw std::runtime_error(std::string("epoll_ctl: ") + strerror(errno));

@@ -131,8 +131,8 @@ struct osd_client_t
     int read_ready = 0;
     osd_op_t *read_op = NULL;
     int read_reply_id = 0;
-    iovec read_iov;
-    msghdr read_msg;
+    iovec read_iov = { 0 };
+    msghdr read_msg = { 0 };
     void *read_buf = NULL;
     int read_remaining = 0;
     int read_state = 0;
@@ -215,6 +215,7 @@ class osd_t
     // event loop, socket read/write
     void loop();
     void handle_epoll_events();
+    bool try_receive(osd_client_t & cl);
     void read_requests();
     void handle_read(ring_data_t *data, int peer_fd);
     void handle_op_hdr(osd_client_t *cl);
