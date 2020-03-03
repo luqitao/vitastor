@@ -122,8 +122,9 @@ int blockstore_impl_t::dequeue_write(blockstore_op_t *op)
         data->iov.iov_len = op->len + stripe_offset + stripe_end; // to check it in the callback
         data->callback = [this, op](ring_data_t *data) { handle_write_event(data, op); };
         my_uring_prep_writev(
-            sqe, data_fd, PRIV(op)->iov_zerofill, vcnt, data_offset + (loc << block_order) + op->offset - stripe_offset
+            sqe, data_fd_index, PRIV(op)->iov_zerofill, vcnt, data_offset + (loc << block_order) + op->offset - stripe_offset
         );
+        sqe->flags |= IOSQE_FIXED_FILE;
         PRIV(op)->pending_ops = 1;
         PRIV(op)->min_used_journal_sector = PRIV(op)->max_used_journal_sector = 0;
         // Remember big write as unsynced
@@ -198,8 +199,9 @@ int blockstore_impl_t::dequeue_write(blockstore_op_t *op)
             data2->iov = (struct iovec){ op->buf, op->len };
             data2->callback = cb;
             my_uring_prep_writev(
-                sqe2, journal.fd, &data2->iov, 1, journal.offset + journal.next_free
+                sqe2, journal_fd_index, &data2->iov, 1, journal.offset + journal.next_free
             );
+            sqe2->flags |= IOSQE_FIXED_FILE;
             PRIV(op)->pending_ops++;
         }
         else

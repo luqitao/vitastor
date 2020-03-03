@@ -5,7 +5,7 @@
 class timerfd_interval
 {
     int wait_state;
-    int timerfd;
+    int timerfd, timerfd_index;
     int status;
     ring_loop_t *ringloop;
     ring_consumer_t consumer;

@@ -116,6 +116,7 @@ void osd_t::handle_connect_result(int peer_fd)
     int one = 1;
     setsockopt(peer_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
     // Disable EPOLLOUT on this fd
+    cl.peer_fd_index = ringloop->register_fd(peer_fd);
     cl.connect_callback = NULL;
     cl.peer_state = PEER_CONNECTED;
     epoll_event ev;

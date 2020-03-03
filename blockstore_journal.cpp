@@ -126,8 +126,9 @@ void prepare_journal_sector_write(journal_t & journal, int cur_sector, io_uring_
     };
     data->callback = cb;
     my_uring_prep_writev(
-        sqe, journal.fd, &data->iov, 1, journal.offset + journal.sector_info[cur_sector].offset
+        sqe, journal.fd_index, &data->iov, 1, journal.offset + journal.sector_info[cur_sector].offset
     );
+    sqe->flags |= IOSQE_FIXED_FILE;
 }
 
 journal_t::~journal_t()

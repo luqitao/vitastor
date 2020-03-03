@@ -130,7 +130,7 @@ struct journal_sector_info_t
 
 struct journal_t
 {
-    int fd;
+    int fd, fd_index;
     uint64_t device_size;
     bool inmemory = false;
     void *buffer = NULL;

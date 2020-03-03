@@ -287,8 +287,9 @@ resume_1:
             data->iov = (struct iovec){ it->buf, (size_t)it->len };
             data->callback = simple_callback_w;
             my_uring_prep_writev(
-                sqe, bs->data_fd, &data->iov, 1, bs->data_offset + clean_loc + it->offset
+                sqe, bs->data_fd_index, &data->iov, 1, bs->data_offset + clean_loc + it->offset
             );
+            sqe->flags |= IOSQE_FIXED_FILE;
             wait_count++;
         }
         // Sync data before writing metadata
@@ -320,8 +321,9 @@ resume_1:
             data->iov = (struct iovec){ meta_old.buf, bs->meta_block_size };
             data->callback = simple_callback_w;
             my_uring_prep_writev(
-                sqe, bs->meta_fd, &data->iov, 1, bs->meta_offset + meta_old.sector
+                sqe, bs->meta_fd_index, &data->iov, 1, bs->meta_offset + meta_old.sector
             );
+            sqe->flags |= IOSQE_FIXED_FILE;
             wait_count++;
         }
         if (has_delete)
@@ -342,8 +344,9 @@ resume_1:
         data->iov = (struct iovec){ meta_new.buf, bs->meta_block_size };
         data->callback = simple_callback_w;
         my_uring_prep_writev(
-            sqe, bs->meta_fd, &data->iov, 1, bs->meta_offset + meta_new.sector
+            sqe, bs->meta_fd_index, &data->iov, 1, bs->meta_offset + meta_new.sector
         );
+        sqe->flags |= IOSQE_FIXED_FILE;
         wait_count++;
     resume_7:
         if (wait_count > 0)
@@ -405,7 +408,8 @@ resume_1:
                 ((journal_entry_start*)flusher->journal_superblock)->crc32 = je_crc32((journal_entry*)flusher->journal_superblock);
                 data->iov = (struct iovec){ flusher->journal_superblock, bs->journal_block_size };
                 data->callback = simple_callback_w;
-                my_uring_prep_writev(sqe, bs->journal.fd, &data->iov, 1, bs->journal.offset);
+                my_uring_prep_writev(sqe, bs->journal_fd_index, &data->iov, 1, bs->journal.offset);
+                sqe->flags |= IOSQE_FIXED_FILE;
                 wait_count++;
             resume_13:
                 if (wait_count > 0)
@@ -485,8 +489,9 @@ bool journal_flusher_co::scan_dirty(int wait_base)
                             data->iov = (struct iovec){ v.back().buf, (size_t)submit_len };
                             data->callback = simple_callback_r;
                             my_uring_prep_readv(
-                                sqe, bs->journal.fd, &data->iov, 1, bs->journal.offset + submit_offset
+                                sqe, bs->journal_fd_index, &data->iov, 1, bs->journal.offset + submit_offset
                             );
+                            sqe->flags |= IOSQE_FIXED_FILE;
                             wait_count++;
                         }
                     }
@@ -568,8 +573,9 @@ bool journal_flusher_co::modify_meta_read(uint64_t meta_loc, flusher_meta_write_
         data->callback = simple_callback_r;
         wr.submitted = true;
         my_uring_prep_readv(
-            sqe, bs->meta_fd, &data->iov, 1, bs->meta_offset + wr.sector
+            sqe, bs->meta_fd_index, &data->iov, 1, bs->meta_offset + wr.sector
         );
+        sqe->flags |= IOSQE_FIXED_FILE;
         wait_count++;
     }
     else
@@ -638,7 +644,8 @@ bool journal_flusher_co::fsync_batch(bool fsync_meta, int wait_base)
             await_sqe(0);
             data->iov = { 0 };
             data->callback = simple_callback_w;
-            my_uring_prep_fsync(sqe, fsync_meta ? bs->meta_fd : bs->data_fd, IORING_FSYNC_DATASYNC);
+            my_uring_prep_fsync(sqe, fsync_meta ? bs->meta_fd_index : bs->data_fd_index, IORING_FSYNC_DATASYNC);
+            sqe->flags |= IOSQE_FIXED_FILE;
             cur_sync->state = 1;
             wait_count++;
         resume_1:

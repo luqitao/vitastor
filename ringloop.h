@@ -107,6 +107,7 @@ static inline void my_uring_prep_cancel(struct io_uring_sqe *sqe, void *user_dat
 struct ring_data_t
 {
     struct iovec iov; // for single-entry read/write operations
+    bool allow_cancel;
     int res;
     std::function<void(ring_data_t*)> callback;
 };
@@ -122,22 +123,35 @@ class ring_loop_t
     std::vector<ring_consumer_t> consumers;
     struct ring_data_t *ring_datas;
     int *free_ring_data;
-    unsigned free_ring_data_ptr;
+    unsigned free_ring_data_ptr, ring_data_total;
     bool loop_again;
     struct io_uring ring;
+    int registered = 0;
+    std::vector<int> reg_fds;
+    void drain_events(void *completions_ptr);
+    void run_completions(void *completions_ptr);
+
 public:
     ring_loop_t(int qd);
     ~ring_loop_t();
     int register_consumer(ring_consumer_t & consumer);
     void unregister_consumer(ring_consumer_t & consumer);
 
+    int register_fd(int fd);
+    void unregister_fd(int fd_index);
+
     inline struct io_uring_sqe* get_sqe()
     {
         if (free_ring_data_ptr == 0)
+        {
             return NULL;
+        }
         struct io_uring_sqe* sqe = io_uring_get_sqe(&ring);
         if (sqe)
-            io_uring_sqe_set_data(sqe, ring_datas + free_ring_data[--free_ring_data_ptr]);
+        {
+            ring_data_t *data = ring_datas + free_ring_data[--free_ring_data_ptr];
+            io_uring_sqe_set_data(sqe, data);
+        }
         return sqe;
     }
     inline int submit()

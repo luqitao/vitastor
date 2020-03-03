@@ -31,10 +31,11 @@ int blockstore_impl_t::fulfill_read_push(blockstore_op_t *op, void *buf, uint64_
     PRIV(op)->pending_ops++;
     my_uring_prep_readv(
         sqe,
-        IS_JOURNAL(item_state) ? journal.fd : data_fd,
+        IS_JOURNAL(item_state) ? journal_fd_index : data_fd_index,
         &data->iov, 1,
         (IS_JOURNAL(item_state) ? journal.offset : data_offset) + offset
     );
+    sqe->flags |= IOSQE_FIXED_FILE;
     data->callback = [this, op](ring_data_t *data) { handle_read_event(data, op); };
     return 1;
 }

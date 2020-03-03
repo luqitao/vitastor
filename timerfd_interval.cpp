@@ -21,6 +21,7 @@ timerfd_interval::timerfd_interval(ring_loop_t *ringloop, int seconds, std::func
     }
     consumer.loop = [this]() { loop(); };
     ringloop->register_consumer(consumer);
+    timerfd_index = ringloop->register_fd(timerfd);
     this->ringloop = ringloop;
     this->callback = cb;
 }
@@ -44,10 +45,12 @@ void timerfd_interval::loop()
         return;
     }
     struct ring_data_t *data = ((ring_data_t*)sqe->user_data);
-    my_uring_prep_poll_add(sqe, timerfd, POLLIN);
+    my_uring_prep_poll_add(sqe, timerfd_index, POLLIN);
+    sqe->flags |= IOSQE_FIXED_FILE;
+    data->allow_cancel = true;
     data->callback = [&](ring_data_t *data)
     {
-        if (data->res < 0)
+        if (data->res < 0 && data->res != -ECANCELED)
         {
             throw std::runtime_error(std::string("waiting for timer failed: ") + strerror(-data->res));
         }

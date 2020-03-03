@@ -78,7 +78,8 @@ int blockstore_impl_t::continue_sync(blockstore_op_t *op)
         if (!disable_data_fsync)
         {
             BS_SUBMIT_GET_SQE(sqe, data);
-            my_uring_prep_fsync(sqe, data_fd, IORING_FSYNC_DATASYNC);
+            my_uring_prep_fsync(sqe, data_fd_index, IORING_FSYNC_DATASYNC);
+            sqe->flags |= IOSQE_FIXED_FILE;
             data->iov = { 0 };
             data->callback = cb;
             PRIV(op)->min_used_journal_sector = PRIV(op)->max_used_journal_sector = 0;
@@ -161,7 +162,8 @@ int blockstore_impl_t::continue_sync(blockstore_op_t *op)
         if (!disable_journal_fsync)
         {
             BS_SUBMIT_GET_SQE(sqe, data);
-            my_uring_prep_fsync(sqe, journal.fd, IORING_FSYNC_DATASYNC);
+            my_uring_prep_fsync(sqe, journal_fd_index, IORING_FSYNC_DATASYNC);
+            sqe->flags |= IOSQE_FIXED_FILE;
             data->iov = { 0 };
             data->callback = cb;
             PRIV(op)->pending_ops = 1;

@@ -49,7 +49,8 @@ bool osd_t::try_send(osd_client_t & cl)
     cl.write_msg.msg_iov = cl.write_op->send_list.get_iovec();
     cl.write_msg.msg_iovlen = cl.write_op->send_list.get_size();
     data->callback = [this, peer_fd](ring_data_t *data) { handle_send(data, peer_fd); };
-    my_uring_prep_sendmsg(sqe, peer_fd, &cl.write_msg, 0);
+    my_uring_prep_sendmsg(sqe, cl.peer_fd_index, &cl.write_msg, 0);
+    sqe->flags |= IOSQE_FIXED_FILE;
     return true;
 }
 
@@ -69,32 +70,33 @@ void osd_t::send_replies()
 
 void osd_t::handle_send(ring_data_t *data, int peer_fd)
 {
+    int res = data->res;
     auto cl_it = clients.find(peer_fd);
     if (cl_it != clients.end())
     {
         auto & cl = cl_it->second;
-        if (data->res < 0 && data->res != -EAGAIN)
+        if (res < 0 && res != -EAGAIN)
         {
             // this is a client socket, so don't panic. just disconnect it
-            printf("Client %d socket write error: %d (%s). Disconnecting client\n", peer_fd, -data->res, strerror(-data->res));
+            printf("Client %d socket write error: %d (%s). Disconnecting client\n", peer_fd, -res, strerror(-res));
             stop_client(peer_fd);
             return;
         }
-        if (data->res >= 0)
+        if (res >= 0)
         {
             osd_op_t *cur_op = cl.write_op;
-            while (data->res > 0 && cur_op->send_list.sent < cur_op->send_list.count)
+            while (res > 0 && cur_op->send_list.sent < cur_op->send_list.count)
             {
                 iovec & iov = cur_op->send_list.buf[cur_op->send_list.sent];
-                if (iov.iov_len <= data->res)
+                if (iov.iov_len <= res)
                 {
-                    data->res -= iov.iov_len;
+                    res -= iov.iov_len;
                     cur_op->send_list.sent++;
                 }
                 else
                 {
-                    iov.iov_len -= data->res;
-                    iov.iov_base += data->res;
+                    iov.iov_len -= res;
+                    iov.iov_base += res;
                     break;
                 }
             }

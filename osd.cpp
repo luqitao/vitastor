@@ -110,6 +110,7 @@ osd_t::osd_t(blockstore_config_t & config, blockstore_t *bs, ring_loop_t *ringlo
         close(listen_fd);
         throw std::runtime_error(std::string("epoll_create: ") + strerror(errno));
     }
+    epoll_fd_index = ringloop->register_fd(epoll_fd);
 
     epoll_event ev;
     ev.data.fd = listen_fd;
@@ -186,16 +187,19 @@ void osd_t::handle_epoll_events()
         throw std::runtime_error("can't get SQE, will fall out of sync with EPOLLET");
     }
     ring_data_t *data = ((ring_data_t*)sqe->user_data);
-    my_uring_prep_poll_add(sqe, epoll_fd, POLLIN);
+    data->allow_cancel = true;
+    my_uring_prep_poll_add(sqe, epoll_fd_index, POLLIN);
+    sqe->flags |= IOSQE_FIXED_FILE;
     data->callback = [this](ring_data_t *data)
     {
-        if (data->res < 0)
+        if (data->res < 0 && data->res != -ECANCELED)
         {
             throw std::runtime_error(std::string("epoll failed: ") + strerror(-data->res));
         }
         handle_epoll_events();
     };
     ringloop->submit();
+    // FIXME With SQ thread we have no guarantee that epoll request will be submitted right here...
     int nfds;
     epoll_event events[MAX_EPOLL_EVENTS];
 restart:
@@ -219,12 +223,13 @@ restart:
                     .peer_addr = addr,
                     .peer_port = ntohs(addr.sin_port),
                     .peer_fd = peer_fd,
+                    .peer_fd_index = ringloop->register_fd(peer_fd),
                     .peer_state = PEER_CONNECTED,
                 };
                 // Add FD to epoll
                 epoll_event ev;
                 ev.data.fd = peer_fd;
-                ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP;
+                ev.events = EPOLLIN | EPOLLRDHUP | EPOLLET;
                 if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, peer_fd, &ev) < 0)
                 {
                     throw std::runtime_error(std::string("epoll_ctl: ") + strerror(errno));
@@ -263,7 +268,7 @@ restart:
             }
         }
     }
-    if (nfds == MAX_EPOLL_EVENTS)
+    if (nfds > 0)
     {
         goto restart;
     }

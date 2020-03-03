@@ -55,7 +55,8 @@ int blockstore_init_meta::loop()
                 bs->meta_len - metadata_read > bs->metadata_buf_size ? bs->metadata_buf_size : bs->meta_len - metadata_read,
             };
             data->callback = [this](ring_data_t *data) { handle_event(data); };
-            my_uring_prep_readv(sqe, bs->meta_fd, &data->iov, 1, bs->meta_offset + metadata_read);
+            my_uring_prep_readv(sqe, bs->meta_fd_index, &data->iov, 1, bs->meta_offset + metadata_read);
+            sqe->flags |= IOSQE_FIXED_FILE;
             bs->ringloop->submit();
             submitted = (prev == 1 ? 2 : 1);
             prev = submitted;
@@ -216,7 +217,8 @@ int blockstore_init_journal::loop()
     data = ((ring_data_t*)sqe->user_data);
     data->iov = { submitted_buf, bs->journal.block_size };
     data->callback = simple_callback;
-    my_uring_prep_readv(sqe, bs->journal.fd, &data->iov, 1, bs->journal.offset);
+    my_uring_prep_readv(sqe, bs->journal_fd_index, &data->iov, 1, bs->journal.offset);
+    sqe->flags |= IOSQE_FIXED_FILE;
     bs->ringloop->submit();
     wait_count = 1;
 resume_1:
@@ -254,7 +256,8 @@ resume_1:
             GET_SQE();
             data->iov = (struct iovec){ submitted_buf, 2*bs->journal.block_size };
             data->callback = simple_callback;
-            my_uring_prep_writev(sqe, bs->journal.fd, &data->iov, 1, bs->journal.offset);
+            my_uring_prep_writev(sqe, bs->journal_fd_index, &data->iov, 1, bs->journal.offset);
+            sqe->flags |= IOSQE_FIXED_FILE;
             wait_count++;
             bs->ringloop->submit();
         resume_6:
@@ -266,7 +269,8 @@ resume_1:
             if (!bs->disable_journal_fsync)
             {
                 GET_SQE();
-                my_uring_prep_fsync(sqe, bs->journal.fd, IORING_FSYNC_DATASYNC);
+                my_uring_prep_fsync(sqe, bs->journal_fd_index, IORING_FSYNC_DATASYNC);
+                sqe->flags |= IOSQE_FIXED_FILE;
                 data->iov = { 0 };
                 data->callback = simple_callback;
                 wait_count++;
@@ -325,7 +329,8 @@ resume_1:
                     end - journal_pos < JOURNAL_BUFFER_SIZE ? end - journal_pos : JOURNAL_BUFFER_SIZE,
                 };
                 data->callback = [this](ring_data_t *data1) { handle_event(data1); };
-                my_uring_prep_readv(sqe, bs->journal.fd, &data->iov, 1, bs->journal.offset + journal_pos);
+                my_uring_prep_readv(sqe, bs->journal_fd_index, &data->iov, 1, bs->journal.offset + journal_pos);
+                sqe->flags |= IOSQE_FIXED_FILE;
                 bs->ringloop->submit();
             }
             while (done.size() > 0)
@@ -340,7 +345,8 @@ resume_1:
                         GET_SQE();
                         data->iov = { init_write_buf, bs->journal.block_size };
                         data->callback = simple_callback;
-                        my_uring_prep_writev(sqe, bs->journal.fd, &data->iov, 1, bs->journal.offset + init_write_sector);
+                        my_uring_prep_writev(sqe, bs->journal_fd_index, &data->iov, 1, bs->journal.offset + init_write_sector);
+                        sqe->flags |= IOSQE_FIXED_FILE;
                         wait_count++;
                         bs->ringloop->submit();
                     resume_7:
@@ -354,7 +360,8 @@ resume_1:
                             GET_SQE();
                             data->iov = { 0 };
                             data->callback = simple_callback;
-                            my_uring_prep_fsync(sqe, bs->journal.fd, IORING_FSYNC_DATASYNC);
+                            my_uring_prep_fsync(sqe, bs->journal_fd_index, IORING_FSYNC_DATASYNC);
+                            sqe->flags |= IOSQE_FIXED_FILE;
                             wait_count++;
                             bs->ringloop->submit();
                         }

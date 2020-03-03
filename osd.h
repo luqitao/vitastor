@@ -122,7 +122,7 @@ struct osd_client_t
 {
     sockaddr_in peer_addr;
     int peer_port;
-    int peer_fd;
+    int peer_fd, peer_fd_index;
     int peer_state;
     std::function<void(osd_num_t, int)> connect_callback;
     osd_num_t osd_num = 0;
@@ -196,7 +196,7 @@ class osd_t
     timerfd_interval *tick_tfd;
 
     int wait_state = 0;
-    int epoll_fd = 0;
+    int epoll_fd = 0, epoll_fd_index = -1;
     int listen_fd = 0;
     ring_consumer_t consumer;
 

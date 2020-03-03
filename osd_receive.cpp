@@ -32,36 +32,38 @@ void osd_t::read_requests()
         cl.read_msg.msg_iov = &cl.read_iov;
         cl.read_msg.msg_iovlen = 1;
         data->callback = [this, peer_fd](ring_data_t *data) { handle_read(data, peer_fd); };
-        my_uring_prep_recvmsg(sqe, peer_fd, &cl.read_msg, 0);
+        my_uring_prep_recvmsg(sqe, cl.peer_fd_index, &cl.read_msg, 0);
+        sqe->flags |= IOSQE_FIXED_FILE;
     }
     read_ready_clients.clear();
 }
 
 void osd_t::handle_read(ring_data_t *data, int peer_fd)
 {
+    int res = data->res;
     auto cl_it = clients.find(peer_fd);
     if (cl_it != clients.end())
     {
         auto & cl = cl_it->second;
-        if (data->res == -EAGAIN)
+        if (res == -EAGAIN)
         {
             cl.read_ready--;
             if (cl.read_ready > 0)
                 read_ready_clients.push_back(peer_fd);
             return;
         }
-        else if (data->res < 0)
+        else if (res < 0)
         {
             // this is a client socket, so don't panic. just disconnect it
-            printf("Client %d socket read error: %d (%s). Disconnecting client\n", peer_fd, -data->res, strerror(-data->res));
+            printf("Client %d socket read error: %d (%s). Disconnecting client\n", peer_fd, -res, strerror(-res));
             stop_client(peer_fd);
             return;
         }
         read_ready_clients.push_back(peer_fd);
-        if (data->res > 0)
+        if (res > 0)
         {
-            cl.read_remaining -= data->res;
-            cl.read_buf += data->res;
+            cl.read_remaining -= res;
+            cl.read_buf += res;
             if (cl.read_remaining <= 0)
             {
                 cl.read_buf = NULL;

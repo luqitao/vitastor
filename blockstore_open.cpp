@@ -140,6 +140,10 @@ void blockstore_impl_t::parse_config(blockstore_config_t & config)
 
 void blockstore_impl_t::calc_lengths()
 {
+    // register fds
+    data_fd_index = ringloop->register_fd(data_fd);
+    meta_fd_index = meta_fd == data_fd ? data_fd_index : ringloop->register_fd(meta_fd);
+    journal.fd_index = journal_fd_index = journal.fd == meta_fd ? meta_fd_index : ringloop->register_fd(journal.fd);
     // data
     data_len = data_size - data_offset;
     if (data_fd == meta_fd && data_offset < meta_offset)
