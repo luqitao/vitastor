@@ -146,8 +146,7 @@ public:
     }
     inline int wait()
     {
-        struct io_uring_cqe *cqe;
-        return io_uring_wait_cqe(&ring, &cqe);
+        return io_uring_submit_and_wait(&ring, 1);
     }
     inline unsigned space_left()
     {

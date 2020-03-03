@@ -175,7 +175,6 @@ void osd_t::loop()
     handle_peers();
     read_requests();
     send_replies();
-    ringloop->submit();
 }
 
 void osd_t::handle_epoll_events()

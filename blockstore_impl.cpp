@@ -196,11 +196,6 @@ void blockstore_impl_t::loop()
         {
             flusher->loop();
         }
-        int ret = ringloop->submit();
-        if (ret < 0)
-        {
-            throw std::runtime_error(std::string("io_uring_submit: ") + strerror(-ret));
-        }
         if ((initial_ring_space - ringloop->space_left()) > 0)
         {
             live = true;
