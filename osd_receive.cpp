@@ -6,6 +6,11 @@ void cluster_client_t::read_requests()
     {
         int peer_fd = read_ready_clients[i];
         auto & cl = clients[peer_fd];
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
         io_uring_sqe* sqe = ringloop->get_sqe();
         if (!sqe)
         {

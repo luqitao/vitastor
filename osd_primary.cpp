@@ -199,6 +199,7 @@ void osd_t::continue_primary_write(osd_op_t *cur_op)
     else if (op_data->st == 7) goto resume_7;
     else if (op_data->st == 8) goto resume_8;
     assert(op_data->st == 0);
+    printf("primary_write\n");
     if (!check_write_queue(cur_op, pg))
     {
         return;
@@ -387,6 +388,7 @@ void osd_t::continue_primary_sync(osd_op_t *cur_op)
     else if (op_data->st == 5) goto resume_5;
     else if (op_data->st == 6) goto resume_6;
     assert(op_data->st == 0);
+    printf("primary_sync\n");
     if (syncs_in_progress.size() > 0)
     {
         // Wait for previous syncs, if any

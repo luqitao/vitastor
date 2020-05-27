@@ -62,6 +62,11 @@
     struct ring_data_t *data = ((ring_data_t*)sqe->user_data)
 
 #define BS_SUBMIT_GET_ONLY_SQE(sqe) \
+        {\
+            timespec now;\
+            clock_gettime(CLOCK_REALTIME, &now);\
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);\
+        }\
     struct io_uring_sqe *sqe = get_sqe();\
     if (!sqe)\
     {\
@@ -71,6 +76,11 @@
     }
 
 #define BS_SUBMIT_GET_SQE_DECL(sqe) \
+        {\
+            timespec now;\
+            clock_gettime(CLOCK_REALTIME, &now);\
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);\
+        }\
     sqe = get_sqe();\
     if (!sqe)\
     {\

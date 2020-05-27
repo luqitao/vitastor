@@ -25,6 +25,11 @@ void cluster_client_t::outbox_push(osd_op_t *cur_op)
 bool cluster_client_t::try_send(osd_client_t & cl)
 {
     int peer_fd = cl.peer_fd;
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
     io_uring_sqe* sqe = ringloop->get_sqe();
     if (!sqe)
     {

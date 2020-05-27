@@ -261,6 +261,11 @@ void osd_t::set_fd_handler(int fd, bool out, std::function<void(int, int)> handl
 void osd_t::handle_epoll_events()
 {
     wait_state = 0;
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
     io_uring_sqe *sqe = ringloop->get_sqe();
     if (!sqe)
     {
@@ -324,6 +329,7 @@ restart:
             cb(events[i].data.fd, events[i].events);
         }
     }
+    printf("%d events\n", nfds);
     if (nfds == MAX_EPOLL_EVENTS)
     {
         goto restart;

@@ -116,6 +116,11 @@ void journal_flusher_t::force_start()
 
 #define await_sqe(label) \
     resume_##label:\
+        {\
+            timespec now;\
+            clock_gettime(CLOCK_REALTIME, &now);\
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);\
+        }\
         sqe = bs->get_sqe();\
         if (!sqe)\
         {\
