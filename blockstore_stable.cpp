@@ -147,6 +147,11 @@ resume_2:
 resume_3:
     if (!disable_journal_fsync)
     {
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
         io_uring_sqe *sqe = get_sqe();
         if (!sqe)
         {
@@ -237,6 +242,11 @@ void blockstore_impl_t::handle_stable_event(ring_data_t *data, blockstore_op_t *
     PRIV(op)->pending_ops--;
     if (PRIV(op)->pending_ops == 0)
     {
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("finished %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
         PRIV(op)->op_state++;
         if (!continue_stable(op))
         {

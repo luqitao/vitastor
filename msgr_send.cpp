@@ -81,6 +81,11 @@ bool osd_messenger_t::try_send(osd_client_t & cl)
     int result = sendmsg(peer_fd, &cl.write_msg, MSG_NOSIGNAL);
     if (result < 0)
         result = -errno;
+    {
+        timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
+        printf("sendmsg done %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+    }
     handle_send(result, peer_fd);
     return true;
 }

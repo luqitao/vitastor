@@ -33,6 +33,12 @@ journal_flusher_co::journal_flusher_co()
             );
         }
         wait_count--;
+        if (!wait_count)
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("finished %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
     };
     simple_callback_w = [this](ring_data_t* data)
     {
@@ -45,6 +51,12 @@ journal_flusher_co::journal_flusher_co()
             );
         }
         wait_count--;
+        if (!wait_count)
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("finished %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
     };
 }
 
@@ -122,6 +134,11 @@ void journal_flusher_t::release_trim()
 
 #define await_sqe(label) \
     resume_##label:\
+        {\
+            timespec now;\
+            clock_gettime(CLOCK_REALTIME, &now);\
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);\
+        }\
         sqe = bs->get_sqe();\
         if (!sqe)\
         {\

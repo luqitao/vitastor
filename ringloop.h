@@ -4,6 +4,8 @@
 #define _LARGEFILE64_SOURCE
 #endif
 
+#include <stdio.h>
+#include <time.h>
 #include <string.h>
 #include <assert.h>
 #include <liburing.h>
@@ -158,7 +160,13 @@ public:
     }
     inline int submit()
     {
-        return io_uring_submit(&ring);
+        int r = io_uring_submit(&ring);
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("submit %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
+        return r;
     }
     inline int wait()
     {

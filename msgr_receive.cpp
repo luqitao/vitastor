@@ -24,6 +24,11 @@ void osd_messenger_t::read_requests()
         {
             result = -errno;
         }
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("recvmsg done %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
         handle_read(result, peer_fd);
     }
 }

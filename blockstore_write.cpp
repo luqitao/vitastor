@@ -302,6 +302,11 @@ int blockstore_impl_t::continue_write(blockstore_op_t *op)
         return 1;
 resume_2:
     // Only for the immediate_commit mode: prepare and submit big_write journal entry
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("get_sqe %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
     sqe = get_sqe();
     if (!sqe)
     {
@@ -333,6 +338,11 @@ resume_2:
     return 1;
 resume_4:
     // Switch object state
+        {
+            timespec now;
+            clock_gettime(CLOCK_REALTIME, &now);
+            printf("write_done %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+        }
 #ifdef BLOCKSTORE_DEBUG
     printf("Ack write %lu:%lu v%lu = %d\n", op->oid.inode, op->oid.stripe, op->version, dirty_it->second.state);
 #endif

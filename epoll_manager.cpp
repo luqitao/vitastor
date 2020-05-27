@@ -57,6 +57,11 @@ void epoll_manager_t::set_fd_handler(int fd, std::function<void(int, int)> handl
 
 void epoll_manager_t::handle_epoll_events()
 {
+    {
+        timespec now;
+        clock_gettime(CLOCK_REALTIME, &now);
+        printf("epoll %s %d %ld.%06ld\n", __FILE__, __LINE__, now.tv_sec, now.tv_nsec/1000);
+    }
     io_uring_sqe *sqe = ringloop->get_sqe();
     if (!sqe)
     {
