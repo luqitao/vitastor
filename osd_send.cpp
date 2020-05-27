@@ -18,6 +18,8 @@ void cluster_client_t::outbox_push(osd_op_t *cur_op)
         }
         ringloop->wakeup();
     }
+    else
+        ringloop->submit();
 }
 
 bool cluster_client_t::try_send(osd_client_t & cl)
