@@ -115,7 +115,7 @@ void cluster_client_t::try_connect_peer_addr(osd_num_t peer_osd, const char *pee
         .osd_num = peer_osd,
         .in_buf = malloc(receive_buffer_size),
     };
-    tfd->set_fd_handler(peer_fd, [this](int peer_fd, int epoll_events)
+    tfd->set_fd_handler(peer_fd, true, [this](int peer_fd, int epoll_events)
     {
         // Either OUT (connected) or HUP
         handle_connect_epoll(peer_fd);
@@ -146,8 +146,7 @@ void cluster_client_t::handle_connect_epoll(int peer_fd)
     int one = 1;
     setsockopt(peer_fd, SOL_TCP, TCP_NODELAY, &one, sizeof(one));
     cl.peer_state = PEER_CONNECTED;
-    // FIXME Disable EPOLLOUT on this fd
-    tfd->set_fd_handler(peer_fd, [this](int peer_fd, int epoll_events)
+    tfd->set_fd_handler(peer_fd, false, [this](int peer_fd, int epoll_events)
     {
         handle_peer_epoll(peer_fd, epoll_events);
     });
@@ -320,7 +319,7 @@ void cluster_client_t::stop_client(int peer_fd)
         }
     }
     clients.erase(it);
-    tfd->set_fd_handler(peer_fd, NULL);
+    tfd->set_fd_handler(peer_fd, false, NULL);
     if (cl.osd_num)
     {
         osd_peer_fds.erase(cl.osd_num);

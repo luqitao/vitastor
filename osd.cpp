@@ -42,7 +42,7 @@ osd_t::osd_t(blockstore_config_t & config, blockstore_t *bs, ring_loop_t *ringlo
         throw std::runtime_error(std::string("epoll_create: ") + strerror(errno));
     }
 
-    this->tfd = new timerfd_manager_t([this](int fd, std::function<void(int, int)> handler) { set_fd_handler(fd, handler); });
+    this->tfd = new timerfd_manager_t([this](int fd, bool out, std::function<void(int, int)> handler) { set_fd_handler(fd, out, handler); });
     this->tfd->set_timer(print_stats_interval*1000, true, [this](int timer_id)
     {
         print_stats();
@@ -202,7 +202,7 @@ void osd_t::bind_socket()
 
     epoll_event ev;
     ev.data.fd = listen_fd;
-    ev.events = EPOLLIN | EPOLLET;
+    ev.events = EPOLLIN;
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, listen_fd, &ev) < 0)
     {
         close(listen_fd);
@@ -234,14 +234,14 @@ void osd_t::loop()
     ringloop->submit();
 }
 
-void osd_t::set_fd_handler(int fd, std::function<void(int, int)> handler)
+void osd_t::set_fd_handler(int fd, bool out, std::function<void(int, int)> handler)
 {
     if (handler != NULL)
     {
         bool exists = epoll_handlers.find(fd) != epoll_handlers.end();
         epoll_event ev;
         ev.data.fd = fd;
-        ev.events = EPOLLOUT | EPOLLIN | EPOLLRDHUP | EPOLLET;
+        ev.events = EPOLLIN | (out ? EPOLLOUT : 0) | EPOLLRDHUP;
         if (epoll_ctl(epoll_fd, exists ? EPOLL_CTL_MOD : EPOLL_CTL_ADD, fd, &ev) < 0)
         {
             throw std::runtime_error(std::string("epoll_ctl: ") + strerror(errno));
@@ -260,11 +260,13 @@ void osd_t::set_fd_handler(int fd, std::function<void(int, int)> handler)
 
 void osd_t::handle_epoll_events()
 {
+    wait_state = 0;
     io_uring_sqe *sqe = ringloop->get_sqe();
     if (!sqe)
     {
-        throw std::runtime_error("can't get SQE, will fall out of sync with EPOLLET");
+        return;
     }
+    wait_state = 1;
     ring_data_t *data = ((ring_data_t*)sqe->user_data);
     my_uring_prep_poll_add(sqe, epoll_fd, POLLIN);
     data->callback = [this](ring_data_t *data)
@@ -275,7 +277,6 @@ void osd_t::handle_epoll_events()
         }
         handle_epoll_events();
     };
-    ringloop->submit();
     int nfds;
     epoll_event events[MAX_EPOLL_EVENTS];
 restart:
@@ -305,7 +306,7 @@ restart:
                     .in_buf = malloc(c_cli.receive_buffer_size),
                 };
                 // Add FD to epoll
-                set_fd_handler(peer_fd, [this](int peer_fd, int epoll_events)
+                set_fd_handler(peer_fd, false, [this](int peer_fd, int epoll_events)
                 {
                     c_cli.handle_peer_epoll(peer_fd, epoll_events);
                 });
