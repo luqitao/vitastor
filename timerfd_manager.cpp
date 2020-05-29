@@ -1,29 +1,24 @@
 #include <sys/timerfd.h>
 #include <sys/poll.h>
-#include <sys/epoll.h>
 #include <unistd.h>
-#include <errno.h>
-#include <string.h>
 #include "timerfd_manager.h"
 
-timerfd_manager_t::timerfd_manager_t(std::function<void(int, std::function<void(int, int)>)> set_fd_handler)
+timerfd_manager_t::timerfd_manager_t(ring_loop_t *ringloop)
 {
-    this->set_fd_handler = set_fd_handler;
     wait_state = 0;
     timerfd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
     if (timerfd < 0)
     {
         throw std::runtime_error(std::string("timerfd_create: ") + strerror(errno));
     }
-    set_fd_handler(timerfd, [this](int fd, int events)
-    {
-        handle_readable();
-    });
+    consumer.loop = [this]() { loop(); };
+    ringloop->register_consumer(&consumer);
+    this->ringloop = ringloop;
 }
 
 timerfd_manager_t::~timerfd_manager_t()
 {
-    set_fd_handler(timerfd, NULL);
+    ringloop->unregister_consumer(&consumer);
     close(timerfd);
 }
 
@@ -53,6 +48,7 @@ int timerfd_manager_t::set_timer(uint64_t millis, bool repeat, std::function<voi
     });
     inc_timer(timers[timers.size()-1]);
     set_nearest();
+    set_wait();
     return timer_id;
 }
 
@@ -73,6 +69,7 @@ void timerfd_manager_t::clear_timer(int timer_id)
                 nearest--;
             }
             set_nearest();
+            set_wait();
             break;
         }
     }
@@ -156,4 +153,37 @@ void timerfd_manager_t::trigger_nearest()
     }
     cb(nearest_id);
     nearest = -1;
+}
+
+void timerfd_manager_t::loop()
+{
+    if (!(wait_state & 1) && timers.size())
+    {
+        set_nearest();
+    }
+    set_wait();
+}
+
+void timerfd_manager_t::set_wait()
+{
+    if ((wait_state & 3) == 1)
+    {
+        io_uring_sqe *sqe = ringloop->get_sqe();
+        if (!sqe)
+        {
+            return;
+        }
+        ring_data_t *data = ((ring_data_t*)sqe->user_data);
+        my_uring_prep_poll_add(sqe, timerfd, POLLIN);
+        data->callback = [this](ring_data_t *data)
+        {
+            if (data->res < 0)
+            {
+                throw std::runtime_error(std::string("waiting for timer failed: ") + strerror(-data->res));
+            }
+            handle_readable();
+            set_wait();
+        };
+        wait_state = 3;
+    }
 }

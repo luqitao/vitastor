@@ -87,7 +87,7 @@ dump_journal.o: dump_journal.cpp allocator.h blockstore.h blockstore_flush.h blo
 	g++ $(CXXFLAGS) -c -o $@ $<
 epoll_manager.o: epoll_manager.cpp epoll_manager.h ringloop.h timerfd_manager.h
 	g++ $(CXXFLAGS) -c -o $@ $<
-etcd_state_client.o: etcd_state_client.cpp base64.h etcd_state_client.h http_client.h json11/json11.hpp object_id.h osd_id.h osd_ops.h pg_states.h timerfd_manager.h
+etcd_state_client.o: etcd_state_client.cpp base64.h etcd_state_client.h http_client.h json11/json11.hpp object_id.h osd_id.h osd_ops.h pg_states.h ringloop.h timerfd_manager.h
 	g++ $(CXXFLAGS) -c -o $@ $<
 fio_cluster.o: fio_cluster.cpp cluster_client.h epoll_manager.h etcd_state_client.h fio/fio.h fio/optgroup.h http_client.h json11/json11.hpp messenger.h object_id.h osd_id.h osd_ops.h ringloop.h timerfd_manager.h
 	g++ $(CXXFLAGS) -c -o $@ $<
@@ -95,7 +95,7 @@ fio_engine.o: fio_engine.cpp blockstore.h fio/fio.h fio/optgroup.h json11/json11
 	g++ $(CXXFLAGS) -c -o $@ $<
 fio_sec_osd.o: fio_sec_osd.cpp fio/fio.h fio/optgroup.h object_id.h osd_id.h osd_ops.h rw_blocking.h
 	g++ $(CXXFLAGS) -c -o $@ $<
-http_client.o: http_client.cpp http_client.h json11/json11.hpp timerfd_manager.h
+http_client.o: http_client.cpp http_client.h json11/json11.hpp ringloop.h timerfd_manager.h
 	g++ $(CXXFLAGS) -c -o $@ $<
 messenger.o: messenger.cpp json11/json11.hpp messenger.h object_id.h osd_id.h osd_ops.h ringloop.h timerfd_manager.h
 	g++ $(CXXFLAGS) -c -o $@ $<
@@ -149,5 +149,5 @@ test_blockstore.o: test_blockstore.cpp blockstore.h object_id.h ringloop.h timer
 	g++ $(CXXFLAGS) -c -o $@ $<
 timerfd_interval.o: timerfd_interval.cpp ringloop.h timerfd_interval.h
 	g++ $(CXXFLAGS) -c -o $@ $<
-timerfd_manager.o: timerfd_manager.cpp timerfd_manager.h
+timerfd_manager.o: timerfd_manager.cpp ringloop.h timerfd_manager.h
 	g++ $(CXXFLAGS) -c -o $@ $<

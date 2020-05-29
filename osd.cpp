@@ -44,7 +44,8 @@ osd_t::osd_t(blockstore_config_t & config, blockstore_t *bs, ring_loop_t *ringlo
         throw std::runtime_error(std::string("epoll_create: ") + strerror(errno));
     }
 
-    this->tfd = new timerfd_manager_t([this](int fd, std::function<void(int, int)> handler) { set_fd_handler(fd, handler); });
+    this->tfd = new timerfd_manager_t(ringloop);
+    this->tfd->set_fd_handler = [this](int fd, std::function<void(int, int)> handler) { set_fd_handler(fd, handler); };
     this->tfd->set_timer(print_stats_interval*1000, true, [this](int timer_id)
     {
         print_stats();
