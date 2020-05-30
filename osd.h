@@ -12,6 +12,8 @@
 
 #include <set>
 #include <deque>
+#include <mutex>
+#include <thread>
 
 #include "blockstore.h"
 #include "ringloop.h"
@@ -114,6 +116,10 @@ class osd_t
 
     int wait_state = 0;
     int epoll_fd = 0;
+    int event_fd = 0;
+    std::thread *epoll_thread = NULL;
+    std::mutex epoll_mutex;
+    std::map<int, int> epoll_ready;
     int listening_port = 0;
     int listen_fd = 0;
     ring_consumer_t consumer;
@@ -150,7 +156,7 @@ class osd_t
     // event loop, socket read/write
     void loop();
     void set_fd_handler(int fd, std::function<void(int, int)> handler);
-    void handle_epoll_events();
+    void handle_eventfd();
 
     // peer handling (primary OSD logic)
     void parse_test_peer(std::string peer);
